@@ -12,40 +12,36 @@ int16_t gyroZ;
 
 uint32_t timer;
 
+MPU9250 IMU(Wire,0x68);
+
 void i2cInit(){
-  Wire.begin();
-  i2cWrite(0x6B,0x00); // Disable sleep mode      
+  // setting the accelerometer full scale range to +/-8G 
+  IMU.setAccelRange(MPU9250::ACCEL_RANGE_2G);
+  // setting the gyroscope full scale range to +/-500 deg/s
+  IMU.setGyroRange(MPU9250::GYRO_RANGE_250DPS);
+  // setting DLPF bandwidth to 20 Hz
+  IMU.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_20HZ);
+  // setting SRD to 9 for a 100 Hz update rate
+  IMU.setSrd(9);
   timer = micros();
 }
 
 void i2cWrite(uint8_t registerAddress, uint8_t data){
-  Wire.beginTransmission(IMUAddress);
-  Wire.write(registerAddress);
-  Wire.write(data);
-  Wire.endTransmission(); // Send stop
+
 }
 
 uint8_t* i2cRead(uint8_t registerAddress, uint8_t nbytes) {
-  uint8_t data[nbytes];
-  Wire.beginTransmission(IMUAddress);
-  Wire.write(registerAddress);
-  Wire.endTransmission(); // Don't release the bus
-  Wire.requestFrom(IMUAddress, nbytes); // Send a repeated start and then release the bus after reading
-  for(uint8_t i = 0; i < nbytes; i++)
-    data [i]= Wire.read();
-  return data;
+  return 0;
 }
 
 void mpuGetRawData( mpuRawData* obj ){
-  uint8_t* data = i2cRead(0x3B,14);
-  obj->accX = ((data[0] << 8) | data[1]);
-  obj->accY = ((data[2] << 8) | data[3]);
-  obj->accZ = ((data[4] << 8) | data[5]);
-  obj->tempRaw = ((data[6] << 8) | data[7]);
-  obj->gyroX = ((data[8] << 8) | data[9]);
-  obj->gyroY = ((data[10] << 8) | data[11]);
-  obj->gyroZ = ((data[12] << 8) | data[13]);
+  IMU.readSensor();
+  obj->accX = IMU.raw_getAccelX_mss();
+  obj->accY = IMU.raw_getAccelY_mss();
+  obj->accZ = IMU.raw_getAccelZ_mss();
+  obj->tempRaw = IMU.raw_getTemperature_C();
+  obj->gyroX = IMU.raw_getGyroX_rads();
+  obj->gyroY = IMU.raw_getGyroY_rads();
+  obj->gyroZ = IMU.raw_getGyroZ_rads();
   return;
 }
-
-
