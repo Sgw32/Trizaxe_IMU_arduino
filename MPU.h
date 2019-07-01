@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include "MPU9250.h"
+
 
 struct mpuRawData{
   int16_t accX;

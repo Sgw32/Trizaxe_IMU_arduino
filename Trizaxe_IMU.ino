@@ -10,6 +10,12 @@
 
 #include <Wire.h>
 #include "MPU.h"
+#include "MPU9250.h"
+
+// an MPU9250 object with the MPU-9250 sensor on I2C bus 0 with address 0x68
+MPU9250 IMU(Wire,0x68);
+int status;
+
 
 //#define PI 3.14159265358979f
 //const float PI = 3.14159265358979;
@@ -74,13 +80,23 @@ float V_mean = 0.0; // м/с текущая отфильтрованная ск�
 float W_Az = 0.0; // текущая угловая скорость
 
 void setup() {
-  Wire.begin();
-  //Serial.begin(38400);
-  //Serial.begin(57600);
+// serial to display data
   Serial.begin(115200);
+  while(!Serial) {}
 
-  i2cInit(); // initialise MPU
-  
+  // start communication with IMU 
+  status = IMU.begin();
+  if (status < 0) {
+    Serial.println("IMU initialization unsuccessful");
+    Serial.println("Check IMU wiring or try cycling power");
+    Serial.print("Status: ");
+    Serial.println(status);
+    while(1) {}
+  }
+  Serial.print("Status: ");
+  Serial.println(status);
+
+  i2cInit();
 //  accelgyro.initialize();
   t_mcs = micros();
   Prev_Time_Period = t_mcs;
@@ -105,7 +121,63 @@ void Test1(){
   
   mpuGetRawData(&RawDataMPU); 
     t_mcs = micros();
-    Serial.print(t_mcs);
+
+    union Cnv
+    {
+      int16_t num;
+      uint8_t dat[2];
+    } cnv;
+
+    union Cnv32
+    {
+      unsigned long num;
+      uint8_t dat[4];
+    } cnv32;
+
+    const uint8_t transmit_len = 20;
+    
+    uint8_t data[transmit_len];
+
+    cnv32.num = t_mcs;
+    data[0] = 0xAA;
+    data[1] = cnv32.dat[0];
+    data[2] = cnv32.dat[1];
+    data[3] = cnv32.dat[2];
+    data[4] = cnv32.dat[3];
+  
+    cnv.num = RawDataMPU.accX;
+    data[5] = cnv.dat[0];
+    data[6] = cnv.dat[1];
+
+    cnv.num = RawDataMPU.accY;
+    data[7] = cnv.dat[0];
+    data[8] = cnv.dat[1];
+
+    cnv.num = RawDataMPU.accZ;
+    data[9] = cnv.dat[0];
+    data[10] = cnv.dat[1];
+
+    cnv.num = RawDataMPU.tempRaw;
+    data[11] = cnv.dat[0];
+    data[12] = cnv.dat[1];
+
+    cnv.num = RawDataMPU.gyroX;
+    data[13] = cnv.dat[0];
+    data[14] = cnv.dat[1];
+
+    cnv.num = RawDataMPU.gyroY;
+    data[15] = cnv.dat[0];
+    data[16] = cnv.dat[1];
+
+    cnv.num = RawDataMPU.gyroZ;
+    data[17] = cnv.dat[0];
+    data[18] = cnv.dat[1];
+
+    for (int i = 0; i < transmit_len-1; i++)
+      data[transmit_len-1] ^= data[i];
+
+    Serial.write(data, transmit_len); 
+    /*Serial.print(t_mcs);
     Serial.print(",");
     Serial.print(RawDataMPU.accX);
     Serial.print(",");
@@ -120,7 +192,8 @@ void Test1(){
     Serial.print(RawDataMPU.gyroY);
     Serial.print(",");
     Serial.print(RawDataMPU.gyroZ);
-    Serial.println("");
+    Serial.println("");*/
+    
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -254,7 +327,7 @@ void GetPitchRoll() {
     Roll = asin(A23); //рад
     
   } // end of if (Calibrate)
-  
+  /*
     Serial.print(t_mcs);
     Serial.print(", ");
     Serial.print(Ar[0]);
@@ -272,7 +345,72 @@ void GetPitchRoll() {
     Serial.print(Pitch1*180/PI);
     Serial.print(", ");
     Serial.print(Roll1*180/PI);
-    Serial.println();    
+    Serial.println();  */  
+
+    union Cnv
+    {
+      int16_t num;
+      uint8_t dat[2];
+    } cnv;
+
+    union Cnv32
+    {
+      unsigned long num;
+      uint8_t dat[4];
+    } cnv32;
+
+    const uint8_t transmit_len = 22;
+    
+    uint8_t data[transmit_len];
+
+    cnv32.num = t_mcs;
+    data[0] = 0xAB;
+    data[1] = cnv32.dat[0];
+    data[2] = cnv32.dat[1];
+    data[3] = cnv32.dat[2];
+    data[4] = cnv32.dat[3];
+  
+    cnv.num = Ar[0];
+    data[5] = cnv.dat[0];
+    data[6] = cnv.dat[1];
+
+    cnv.num = Ar[1];
+    data[7] = cnv.dat[0];
+    data[8] = cnv.dat[1];
+
+    cnv.num = Ar[2];
+    data[9] = cnv.dat[0];
+    data[10] = cnv.dat[1];
+
+    cnv.num = Wr[0];
+    data[11] = cnv.dat[0];
+    data[12] = cnv.dat[1];
+
+    cnv.num = Wr[1];
+    data[13] = cnv.dat[0];
+    data[14] = cnv.dat[1];
+
+    cnv.num = Wr[2];
+    data[15] = cnv.dat[0];
+    data[16] = cnv.dat[1];
+
+    int16_t p1 = (int16_t)(Pitch1*18000/PI);
+    int16_t r1 = (int16_t)(Roll1*18000/PI);
+
+    cnv.num = p1;
+    data[17] = cnv.dat[0];
+    data[18] = cnv.dat[1];
+
+    cnv.num = r1;
+    data[19] = cnv.dat[0];
+    data[20] = cnv.dat[1];
+
+    data[21] = 0; 
+    for (int i = 0; i < transmit_len-1; i++)
+      data[transmit_len-1] ^= data[i];
+
+    Serial.write(data, transmit_len); 
+    
 } // end GetPitchRoll()
 
 

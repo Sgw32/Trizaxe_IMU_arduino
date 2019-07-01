@@ -1,4 +1,5 @@
 #include "MPU.h"
+#include "MPU9250.h"
 
 uint8_t IMUAddress = 0x68;
 
@@ -12,9 +13,10 @@ int16_t gyroZ;
 
 uint32_t timer;
 
-MPU9250 IMU(Wire,0x68);
+extern MPU9250 IMU;
 
 void i2cInit(){
+  
   // setting the accelerometer full scale range to +/-8G 
   IMU.setAccelRange(MPU9250::ACCEL_RANGE_2G);
   // setting the gyroscope full scale range to +/-500 deg/s
