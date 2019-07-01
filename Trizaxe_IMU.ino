@@ -24,7 +24,7 @@ int status;
 const double Tper_LPF = 0.05; // сек Период времени фильтра низких частот, коэффициент K_LPF = (T/dt)/(1+T/dt)
 const double Tper_CF = 2.0; // сек Период времени комплиментарного фильтра, коэффициент K_CF = (T/dt)/(1+T/dt)
 const double da_max = 0.02; // ед g, дупустимое значение перегрузки, когда мы учитываем её в синтезе
-const int n_to_mean_def = 50; // количество точек для начального осреднения
+const int n_to_mean_def = 200; // количество точек для начального осреднения
 const int TimePeriod_IMU = 10000; // мкс, период вызова функции вычисления модуля GetPitchRoll
 
 const int n_MNK = 10; // кол-во точек для определения производной методом МНК
@@ -58,7 +58,7 @@ boolean InitialSet = 0; // флаг указывающий на необходи
 double A[3]; // единиц g,  вектор ориентации в системе координат платы после комплиментарного фильтра
 double W[3]; // рад/сек, 3 компоненты размерной угловой скорости в системе координат платы после фильтра низких частот
 double A_f[3]; // ед g, отфильтрованные после ФНЧ значения перегрузок в системе платы
-long W_zero[3] = {0, 0, 0};
+double W_zero[3] = {0, 0, 0};
 
 unsigned long t_mcs; //mcs текущее время в цикле GetPitchRoll
 unsigned long Prev_Time_Period; // mcs время последнего принудительного вызова функции GetPitchRoll
@@ -209,7 +209,6 @@ void GetPitchRoll() {
   static int n_init = 0; // количество шагов прошедших с инициализации
   long A_t[3];
   long W_t[3];
-  double W_m[3] = {0.0, 0.0, 0.0}; //
   double A_N; // Абсолютное значение перегрузки по данным акселерометра
   double A_N_P; // Абсолютное значение перегрузки по данным акселерометра
   double A_pred[3];
@@ -249,8 +248,8 @@ void GetPitchRoll() {
       for (int i = 0; i <= 2; i++) {
         A_mean[i] = A_mean[i]/n_to_mean_def;
         W_mean[i] = W_mean[i]/n_to_mean_def;
-        W_zero[i] = W_mean[i];
       } // for
+      Get_Scale_Gyro(W_mean, W_zero);
       Mean_data_def = 0; // заканчиваем выставление
       InitData = 1; // ставим флаг, что данные только что инициализированы
     } //
@@ -264,6 +263,7 @@ void GetPitchRoll() {
       A_N = sqrt(A_f[0] * A_f[0] + A_f[1] * A_f[1] + A_f[2] * A_f[2]);     
       for (int i = 0; i <= 2; i++) {   
         A[i] = A_f[i]/A_N; // вектор ориентации определяется по начальному выставлению, по данным акселерометра
+        W[i] = W[i] - W_zero[i];
       }   
       InitData = 0;
       Pitch1 = asin(-A[0]); //рад
@@ -273,21 +273,19 @@ void GetPitchRoll() {
       // делаем переприсвоение присвоение для согласования типов данных  
       for (int i = 0; i <= 2; i++) {
         A_t[i] = Ar[i];      
-        W_t[i] = Wr[i]-W_mean[i]; ////////
+        W_t[i] = Wr[i]; ////////
       }
       Get_Scale_Accel(A_t, A_Scall);   
       Get_Scale_Gyro(W_t, W_Scall);      
       for (int i = 0; i <= 2; i++) { 
         A_f[i] = K_LPF * A_f[i] + (1-K_LPF) * A_Scall[i]; // Значение ускорения после ФНЧ
-        W_m[i] = W[i];
-        W[i] = K_LPF * W[i] + (1-K_LPF) * W_Scall[i]; // Значение угловых скоростей после ФНЧ
-        W_m[i] = (W_m[i]+W[i])/2; // среднее значение угловой скорости по двум измерениям для интегрирования      
+        W[i] = K_LPF * W[i] + (1-K_LPF) * (W_Scall[i]-W_zero[i]); // Значение угловых скоростей после ФНЧ    
       } // end of for 
     } // end of if InitData
     
     // Добавляем поправку на центробежное ускорение
-    A_f[1] = A_f[1] - W_Az/180*3.14*V_mean/9.81*sin(Roll1);
-    A_f[2] = A_f[2] - W_Az/180*3.14*V_mean/9.81*cos(Roll1); 
+    //A_f[1] = A_f[1] - W_Az/180*3.14*V_mean/9.81*sin(Roll1);
+    //A_f[2] = A_f[2] - W_Az/180*3.14*V_mean/9.81*cos(Roll1); 
     
     A_N = sqrt(A_f[0] * A_f[0] + A_f[1] * A_f[1] + A_f[2] * A_f[2]); // модуль перегрузки
     if ((A_N >= 1.0 - da_max) && (A_N <= 1.0 + da_max)) {
@@ -298,9 +296,9 @@ void GetPitchRoll() {
     } // if
     
     // Предсказываем вектор ориентации по данным гироскопа и вектору ориентации, полученном на предыдущем шаге
-    A_pred[0] = A[0] + (-1.0) * (W_m[1] * A[2] - W_m[2] * A[1]) * dt/1e6;
-    A_pred[1] = A[1] - (-1.0) * (W_m[0] * A[2] - W_m[2] * A[0]) * dt/1e6;
-    A_pred[2] = A[2] + (-1.0) * (W_m[0] * A[1] - W_m[1] * A[0]) * dt/1e6;
+    A_pred[0] = A[0] + (-1.0) * (W[1] * A[2] - W[2] * A[1]) * dt/1e6;
+    A_pred[1] = A[1] - (-1.0) * (W[0] * A[2] - W[2] * A[0]) * dt/1e6;
+    A_pred[2] = A[2] + (-1.0) * (W[0] * A[1] - W[1] * A[0]) * dt/1e6;
     //normalize3DVector(A_pred);
     
     A_N_P = sqrt(A_pred[0] * A_pred[0] + A_pred[1] * A_pred[1] + A_pred[2] * A_pred[2]);
@@ -309,7 +307,7 @@ void GetPitchRoll() {
       A[i] = (1-K_CF)*A_pred[i]/A_N_P + K_CF*A_f[i]/A_N;
     }
     
-    A_N = sqrt(A_f[0] * A_f[0] + A_f[1] * A_f[1] + A_f[2] * A_f[2]); // модуль вектора ориентации
+    A_N = sqrt(A[0] * A[0] + A[1] * A[1] + A[2] * A[2]); // модуль вектора ориентации
     // нормируем вектор ориентации
     for (int i = 0; i <= 2; i++) {
       A[i] = A[i]/A_N;
