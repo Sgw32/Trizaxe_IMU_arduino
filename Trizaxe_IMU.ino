@@ -12,6 +12,26 @@
 #include "MPU.h"
 #include "MPU9250.h"
 
+// библиотека для работы с GPS устройством
+#include <TroykaGPS.h>
+
+// serial-порт к которому подключён GPS-модуль
+#define GPS_SERIAL    Serial3
+
+// создаём объект класса GPS и передаём в него объект Serial1 
+GPS gps(GPS_SERIAL);
+
+// задаём размер массива для времени, даты, широты и долготы
+#define MAX_SIZE_MASS 16
+// массив для хранения текущего времени
+char strTime[MAX_SIZE_MASS];
+// массив для хранения текущей даты
+char strDate[MAX_SIZE_MASS];
+// массив для хранения широты в градусах, минутах и секундах
+char latitudeBase60[MAX_SIZE_MASS];
+// массив для хранения долготы в градусах, минутах и секундах
+char longitudeBase60[MAX_SIZE_MASS];
+
 // an MPU9250 object with the MPU-9250 sensor on I2C bus 0 with address 0x68
 MPU9250 IMU(Wire,0x68);
 int status;
@@ -84,6 +104,16 @@ void setup() {
   Serial.begin(115200);
   while(!Serial) {}
 
+  // открываем Serial-соединение с GPS-модулем
+  GPS_SERIAL.begin(115200);
+  
+  delay(1000);
+  GPS_SERIAL.write("$PMTK220,100*2F\r\n$PMTK500,100,0,0,0,0*2A\r\n");
+  delay(1000);
+  GPS_SERIAL.write("$PMTK220,100*2F\r\n$PMTK500,100,0,0,0,0*2A\r\n");
+  delay(1000);
+  GPS_SERIAL.write("$PMTK220,100*2F\r\n$PMTK500,100,0,0,0,0*2A\r\n");
+  
   // start communication with IMU 
   status = IMU.begin();
   if (status < 0) {
@@ -105,6 +135,14 @@ void setup() {
 // Основной цикл
 void loop() {
 
+   // если пришли данные с GPS-модуля
+  if (gps.available()) {
+    // считываем данные и парсим
+    gps.readParsing();
+    // проверяем состояние GPS-модуля\
+    
+  }
+
   if (InitialSet) { // выполняется процедура начального выставления IMU
    Get_Pitch0_Roll0_of_IMU(0.0, 0.0); // входными данными являются углы ориентации объекта в этот момент
   } else // выполняется процедура определени углов ориентации
@@ -115,87 +153,6 @@ void loop() {
   
  //Test1(); 
 }
-
-void Test1(){
-  mpuRawData RawDataMPU;
-  
-  mpuGetRawData(&RawDataMPU); 
-    t_mcs = micros();
-
-    union Cnv
-    {
-      int16_t num;
-      uint8_t dat[2];
-    } cnv;
-
-    union Cnv32
-    {
-      unsigned long num;
-      uint8_t dat[4];
-    } cnv32;
-
-    const uint8_t transmit_len = 20;
-    
-    uint8_t data[transmit_len];
-
-    cnv32.num = t_mcs;
-    data[0] = 0xAA;
-    data[1] = cnv32.dat[0];
-    data[2] = cnv32.dat[1];
-    data[3] = cnv32.dat[2];
-    data[4] = cnv32.dat[3];
-  
-    cnv.num = RawDataMPU.accX;
-    data[5] = cnv.dat[0];
-    data[6] = cnv.dat[1];
-
-    cnv.num = RawDataMPU.accY;
-    data[7] = cnv.dat[0];
-    data[8] = cnv.dat[1];
-
-    cnv.num = RawDataMPU.accZ;
-    data[9] = cnv.dat[0];
-    data[10] = cnv.dat[1];
-
-    cnv.num = RawDataMPU.tempRaw;
-    data[11] = cnv.dat[0];
-    data[12] = cnv.dat[1];
-
-    cnv.num = RawDataMPU.gyroX;
-    data[13] = cnv.dat[0];
-    data[14] = cnv.dat[1];
-
-    cnv.num = RawDataMPU.gyroY;
-    data[15] = cnv.dat[0];
-    data[16] = cnv.dat[1];
-
-    cnv.num = RawDataMPU.gyroZ;
-    data[17] = cnv.dat[0];
-    data[18] = cnv.dat[1];
-
-    for (int i = 0; i < transmit_len-1; i++)
-      data[transmit_len-1] ^= data[i];
-
-    Serial.write(data, transmit_len); 
-    /*Serial.print(t_mcs);
-    Serial.print(",");
-    Serial.print(RawDataMPU.accX);
-    Serial.print(",");
-    Serial.print(RawDataMPU.accY);
-    Serial.print(",");
-    Serial.print(RawDataMPU.accZ);
-    Serial.print(",");
-    Serial.print(RawDataMPU.tempRaw);
-    Serial.print(",");
-    Serial.print(RawDataMPU.gyroX);
-    Serial.print(",");
-    Serial.print(RawDataMPU.gyroY);
-    Serial.print(",");
-    Serial.print(RawDataMPU.gyroZ);
-    Serial.println("");*/
-    
-}
-
 //////////////////////////////////////////////////////////////////////
 // Процедура вычисления углов дифферента и крена, фильтрации перегрузок
 void GetPitchRoll() {
@@ -357,7 +314,7 @@ void GetPitchRoll() {
       uint8_t dat[4];
     } cnv32;
 
-    const uint8_t transmit_len = 22;
+    const uint8_t transmit_len = 26;
     
     uint8_t data[transmit_len];
 
@@ -392,8 +349,8 @@ void GetPitchRoll() {
     data[15] = cnv.dat[0];
     data[16] = cnv.dat[1];
 
-    int16_t p1 = (int16_t)(Pitch1*18000/PI);
-    int16_t r1 = (int16_t)(Roll1*18000/PI);
+    int16_t p1 = (int16_t)(Pitch1*18000.0/PI);
+    int16_t r1 = (int16_t)(Roll1*18000.0/PI);
 
     cnv.num = p1;
     data[17] = cnv.dat[0];
@@ -403,7 +360,18 @@ void GetPitchRoll() {
     data[19] = cnv.dat[0];
     data[20] = cnv.dat[1];
 
-    data[21] = 0; 
+    int i_speed = (int16_t)(gps.getSpeedKm()*100.0);
+    int i_coarse = (int16_t)(gps.getCoarseDeg()*10.0);
+    
+    cnv.num = i_speed;
+    data[21] = cnv.dat[0];
+    data[22] = cnv.dat[1];
+
+    cnv.num = i_coarse;
+    data[23] = cnv.dat[0];
+    data[24] = cnv.dat[1];
+
+    data[transmit_len-1] = 0; 
     for (int i = 0; i < transmit_len-1; i++)
       data[transmit_len-1] ^= data[i];
 

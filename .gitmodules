@@ -1,3 +1,6 @@
 [submodule "MPU9250"]
 	path = MPU9250
 	url = https://github.com/bolderflight/MPU9250.git
+[submodule "TroykaGPS"]
+	path = TroykaGPS
+	url = https://github.com/amperka/TroykaGPS.git
