@@ -107,25 +107,28 @@ void setup() {
   // открываем Serial-соединение с GPS-модулем
   GPS_SERIAL.begin(115200);
   
-  delay(1000);
+  /*delay(1000);
   GPS_SERIAL.write("$PMTK220,100*2F\r\n$PMTK500,100,0,0,0,0*2A\r\n");
   delay(1000);
-  GPS_SERIAL.write("$PMTK220,100*2F\r\n$PMTK500,100,0,0,0,0*2A\r\n");
+  GPS_SERIAL.write("$PMTK220,100*2F\r\n$PMTK500,100,0,0,0,0*2A\r\n");*/
   delay(1000);
   GPS_SERIAL.write("$PMTK220,100*2F\r\n$PMTK500,100,0,0,0,0*2A\r\n");
   
   // start communication with IMU 
   status = IMU.begin();
   if (status < 0) {
-    Serial.println("IMU initialization unsuccessful");
-    Serial.println("Check IMU wiring or try cycling power");
+    //Serial.println("IMU initialization unsuccessful");
+    //Serial.println("Check IMU wiring or try cycling power");
+    while(1) {
     Serial.print("Status: ");
-    Serial.println(status);
-    while(1) {}
+    Serial.println(status);  
+    }
+    
   }
   Serial.print("Status: ");
   Serial.println(status);
-
+  pinMode(PC13,OUTPUT);
+  digitalWrite(PC13,LOW);
   i2cInit();
 //  accelgyro.initialize();
   t_mcs = micros();
@@ -134,14 +137,14 @@ void setup() {
 
 // Основной цикл
 void loop() {
-
+  digitalWrite(PC13,!digitalRead(PC13));
    // если пришли данные с GPS-модуля
-  if (gps.available()) {
+  /*if (gps.available()) {
     // считываем данные и парсим
     gps.readParsing();
     // проверяем состояние GPS-модуля\
     
-  }
+  }*/
 
   if (InitialSet) { // выполняется процедура начального выставления IMU
    Get_Pitch0_Roll0_of_IMU(0.0, 0.0); // входными данными являются углы ориентации объекта в этот момент
@@ -282,8 +285,8 @@ void GetPitchRoll() {
     Roll = asin(A23); //рад
     
   } // end of if (Calibrate)
-  /*
-    Serial.print(t_mcs);
+  
+   /* Serial.print(t_mcs);
     Serial.print(", ");
     Serial.print(Ar[0]);
     Serial.print(",");
@@ -300,7 +303,7 @@ void GetPitchRoll() {
     Serial.print(Pitch1*180/PI);
     Serial.print(", ");
     Serial.print(Roll1*180/PI);
-    Serial.println();  */  
+    Serial.println();    */
 
     union Cnv
     {
@@ -314,7 +317,7 @@ void GetPitchRoll() {
       uint8_t dat[4];
     } cnv32;
 
-    const uint8_t transmit_len = 26;
+    const uint8_t transmit_len = 28;
     
     uint8_t data[transmit_len];
 
@@ -371,12 +374,16 @@ void GetPitchRoll() {
     data[23] = cnv.dat[0];
     data[24] = cnv.dat[1];
 
+    cnv.num = Tempr;
+    data[25] = cnv.dat[0];
+    data[26] = cnv.dat[1];
+
     data[transmit_len-1] = 0; 
     for (int i = 0; i < transmit_len-1; i++)
       data[transmit_len-1] ^= data[i];
 
     Serial.write(data, transmit_len); 
-    
+  
 } // end GetPitchRoll()
 
 

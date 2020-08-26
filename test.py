@@ -25,6 +25,7 @@ pitch = 0;
 roll = 0;
 speed = 0;
 coarse = 0;
+tempr = 0;
 checksum = 0;
 
 filename = datetime.datetime.now().strftime("%d%m%Y%HH%MM%SS") + ".log"
@@ -132,11 +133,16 @@ with open(args.file, "rb") as f:
             if cnt==24:
                b2 = curb
                coarse = toint(b1,b2)
+            if cnt==25:
+               b1 = curb
+            if cnt==26:
+               b2 = curb
+               tempr = toint(b1,b2)
                
             cnt += 1;
             checksum ^= curb;
             #print('checksum ', checksum)
-            if (cnt==26):
+            if (cnt==28):
                 if (checksum==0):
                     output(str(timestamp)+' ',fw)
                     output(str(acc[2])+' ',fw)
@@ -149,6 +155,7 @@ with open(args.file, "rb") as f:
                     output(str(roll)+' ',fw)
                     output(str(speed/100.0)+' ',fw)
                     output(str(coarse/10.0)+' ',fw)
+                    output(str(tempr)+' ',fw)
                     output('\n',fw)
                     records += 1    
                     started = 0
